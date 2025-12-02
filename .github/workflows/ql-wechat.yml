@@ -1,0 +1,13 @@
+name: ql-wechat
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "50 13 * * *"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Time
+        run: echo "Run at $(date)"
