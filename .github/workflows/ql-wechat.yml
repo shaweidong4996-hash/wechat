@@ -1,9 +1,12 @@
+# 青龙面板微信推送自动化工作流
+# 基于青龙脚本的微信公众号推送服务
 name: qinglong-wechat-push
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "35 12 * * *"
+    # 每天国际时间 23:30 运行, 即北京时间 7:30 运行
+    - cron: '30 23 * * *'
 
 jobs:
   validate-and-push:
@@ -14,40 +17,123 @@ jobs:
         node-version: [16.x]
 
     steps:
-    - name: Checkout code
+    # 步骤 1: 检出代码
+    - name: 检出代码
       uses: actions/checkout@v3
       with:
-        ref: "master"
+        ref: 'master'
 
-    - name: Setup Node.js
+    # 步骤 2: 设置 Node.js 环境
+    - name: 设置 Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v3
       with:
         node-version: ${{ matrix.node-version }}
-        cache: "npm"
+        cache: 'npm'
 
-    - name: Validate config
+    # 步骤 3: 环境变量验证
+    - name: 验证必需的环境变量
       env:
         ALL_CONFIG: ${{ secrets.ALL_CONFIG || vars.ALL_CONFIG }}
       run: |
-        echo "Start validating ALL_CONFIG..."
+        echo "🔍 开始验证环境变量配置..."
+
+        # 检查 ALL_CONFIG 是否存在
+        if [ -z "${ALL_CONFIG}" ]; then
+          echo "❌ 错误：ALL_CONFIG 环境变量未配置"
+          echo "请确保在 GitHub Secrets 中设置了 ALL_CONFIG"
+          exit 1
+        fi
+
+        echo "✅ ALL_CONFIG 环境变量已配置"
+
+        # 验证 JSON 格式
+        echo "🔍 验证 ALL_CONFIG JSON 格式..."
         echo "${ALL_CONFIG}" > /tmp/config.json
-        python3 - <<EOF
-import json, sys
-try:
-    with open('/tmp/config.json', 'r') as f:
-        config = json.load(f)
-except Exception as e:
-    print("JSON error:", e)
-    sys.exit(1)
-EOF
+        python3 -c "
+        import json
+        import sys
+        try:
+            with open('/tmp/config.json', 'r') as f:
+                config = json.load(f)
+            print('✅ ALL_CONFIG JSON 格式正确')
 
-    - name: Install dependencies
-      working-directory: ./qinglong
-      run: npm install
+            # 验证必需的配置项
+            if 'TEMPLATE_CONFIG' not in config:
+                print('❌ 错误：TEMPLATE_CONFIG 配置项缺失')
+                sys.exit(1)
 
-    - name: Run script
+            if not config['TEMPLATE_CONFIG'] or len(config['TEMPLATE_CONFIG']) == 0:
+                print('❌ 错误：TEMPLATE_CONFIG 不能为空数组')
+                sys.exit(1)
+
+            print(f'✅ 已找到 {len(config[\"TEMPLATE_CONFIG\"])} 个模板配置')
+
+            if 'USER_INFO' not in config:
+                print('❌ 错误：USER_INFO 配置项缺失')
+                sys.exit(1)
+
+            if not config['USER_INFO'] or len(config['USER_INFO']) == 0:
+                print('❌ 错误：USER_INFO 不能为空数组')
+                sys.exit(1)
+
+            print(f'✅ 已找到 {len(config[\"USER_INFO\"])} 个用户配置')
+
+            # 验证用户配置
+            for i, user in enumerate(config['USER_INFO']):
+                if 'useTemplateId' not in user:
+                    print(f'❌ 错误：用户 {i+1} 缺少 useTemplateId 配置')
+                    sys.exit(1)
+
+                # 检查推送渠道配置
+                has_wechat = 'id' in user and 'wechatTemplateId' in user
+                has_pushdeer = 'pushDeerKey' in user
+
+                if not has_wechat and not has_pushdeer:
+                    print(f'❌ 错误：用户 {i+1} 必须配置微信测试号或 PushDeer 推送渠道')
+                    sys.exit(1)
+
+            print('✅ 所有用户配置验证通过')
+            print('✅ 环境变量验证完成')
+
+        except json.JSONDecodeError as e:
+            print(f'❌ 错误：ALL_CONFIG JSON 格式错误 - {e}')
+            sys.exit(1)
+        except Exception as e:
+            print(f'❌ 错误：验证过程中发生异常 - {e}')
+            sys.exit(1)
+        "
+        rm -f /tmp/config.json
+
+    # 步骤 4: 安装青龙脚本依赖
+    - name: 安装青龙脚本依赖
       working-directory: ./qinglong
+      run: |
+        echo "📦 正在安装青龙脚本依赖..."
+        npm install
+        echo "✅ 依赖安装完成"
+
+    # 步骤 5: 运行青龙推送脚本
+    - name: 运行青龙推送脚本
+      working-directory: ./qinglong
+      run: |
+        echo "🚀 开始运行青龙推送脚本..."
+        node qinglong-push.js
+        echo "✅ 推送任务完成"
       env:
         ALL_CONFIG: ${{ secrets.ALL_CONFIG || vars.ALL_CONFIG }}
-      run: node qinglong-push.js
 
+    # 步骤 6: 运行结果通知
+    - name: 运行结果通知
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ 青龙微信推送任务执行成功！"
+          echo "📱 请检查您的微信或 PushDeer 设备接收推送消息"
+        else
+          echo "❌ 青龙微信推送任务执行失败"
+          echo "🔍 请检查："
+          echo "   1. GitHub Secrets 中的 ALL_CONFIG 配置是否正确"
+          echo "   2. 模板配置和用户配置是否完整"
+          echo "   3. API 密钥和网络连接是否正常"
+          echo "   4. 查看上方详细错误信息进行排查"
+        fi
