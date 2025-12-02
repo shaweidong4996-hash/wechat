@@ -1,6 +1,6 @@
 # 青龙面板微信推送自动化工作流
 # 基于青龙脚本的微信公众号推送服务
-name: qinglong-wechat-push
+name: ql-wechat
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ jobs:
     - name: 检出代码
       uses: actions/checkout@v3
       with:
-        ref: 'master'
+        ref: 'main'
 
     # 步骤 2: 设置 Node.js 环境
     - name: 设置 Node.js ${{ matrix.node-version }}
