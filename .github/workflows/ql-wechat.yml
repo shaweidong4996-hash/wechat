@@ -5,8 +5,10 @@ name: ql-wechat
 on:
   workflow_dispatch:
   schedule:
-    # 每天国际时间 23:30 运行, 即北京时间 7:30 运行
-    - cron: '30 23 * * *'
+    - cron: "55 8 * * *"   # 每天 08:55
+    - cron: "58 8 * * *"   # 每天 08:58
+    - cron: "0 18 * * *"   # 每天 18:00
+    - cron: "2 18 * * *"   # 每天 18:02
 
 jobs:
   validate-and-push:
