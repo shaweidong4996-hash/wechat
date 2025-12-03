@@ -5,10 +5,11 @@ name: ql-wechat
 on:
   workflow_dispatch:
   schedule:
-    - cron: "55 8 * * *"   # 每天 08:55
-    - cron: "58 8 * * *"   # 每天 08:58
-    - cron: "0 18 * * *"   # 每天 18:00
-    - cron: "2 18 * * *"   # 每天 18:02
+  - cron: "55 23 * * *"   # 北京 08:55  -9
+  - cron: "58 23 * * *"   # 北京 08:58
+  - cron: "0 9 * * *"     # 北京 18:00
+  - cron: "2 9 * * *"     # 北京 18:02
+
 
 jobs:
   validate-and-push:
